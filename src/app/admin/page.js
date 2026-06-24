@@ -26,22 +26,33 @@ export default function AdminDashboard() {
 
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    fetchUsers();
-    fetchProducts();
-  }, []);
-
-  const fetchUsers = async () => {
-    const res = await fetch('/api/admin/users');
-    const data = await res.json();
-    if (data.success) setUsers(data.users);
-  };
-
   const fetchProducts = async () => {
     const res = await fetch('/api/admin/products');
     const data = await res.json();
-    if (data.success) setProducts(data.products);
+    if (data.success) {
+      setProducts(data.products);
+      return data.products;
+    }
+    return null;
   };
+
+  useEffect(() => {
+    fetchUsers();
+    fetchProducts().then((loadedProducts) => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const editId = params.get('editId');
+        if (editId && loadedProducts) {
+          setActiveTab('products');
+          const productToEdit = loadedProducts.find(p => p.id === editId);
+          if (productToEdit) {
+            // Need to set timeout so states settle before editing
+            setTimeout(() => handleEditProduct(productToEdit), 100);
+          }
+        }
+      }
+    });
+  }, []);
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -71,6 +82,22 @@ export default function AdminDashboard() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleMultipleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPImages(prev => {
+          const filtered = prev.filter(img => !(img.url === '' && img.data === ''));
+          return [...filtered, { type: 'file', url: '', data: reader.result }];
+        });
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleAddVideo = () => setPVideos([...pVideos, '']);
@@ -267,12 +294,12 @@ export default function AdminDashboard() {
               </div>
               <div className="form-group" style={{ background: '#f8f9fa', padding: '1rem', borderRadius: '8px' }}>
                 <label style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>IDs de YouTube (Opcional)</span>
+                  <span>IDs de YouTube o URLs de Drive (Opcional)</span>
                   <button type="button" onClick={handleAddVideo} style={{ color: 'var(--primary-color)', fontSize: '0.9rem' }}>+ Añadir Video</button>
                 </label>
                 {pVideos.map((vid, i) => (
                   <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <input type="text" placeholder="ej. dQw4w9WgXcQ" value={vid} onChange={(e) => handleVideoChange(i, e.target.value)} />
+                    <input type="text" placeholder="ej. dQw4w9WgXcQ o https://drive.google..." value={vid} onChange={(e) => handleVideoChange(i, e.target.value)} />
                     {pVideos.length > 1 && <button type="button" onClick={() => handleRemoveVideo(i)} style={{ color: 'red' }}>&times;</button>}
                   </div>
                 ))}
@@ -290,7 +317,13 @@ export default function AdminDashboard() {
               <div className="form-group" style={{ border: '1px solid #eee', padding: '1rem', borderRadius: '8px', background: '#f9f9f9' }}>
                 <label style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
                   <span>Imágenes del Producto</span>
-                  <button type="button" onClick={handleAddImage} style={{ color: 'var(--primary-color)', fontSize: '0.9rem', fontWeight: 'bold' }}>+ Añadir Imagen</button>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <button type="button" onClick={handleAddImage} style={{ color: 'var(--primary-color)', fontSize: '0.9rem', fontWeight: 'bold' }}>+ Añadir URL</button>
+                    <label style={{ color: 'var(--primary-color)', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', margin: 0 }}>
+                      + Subir Por Lote
+                      <input type="file" accept="image/*" multiple onChange={handleMultipleImageUpload} style={{ display: 'none' }} />
+                    </label>
+                  </div>
                 </label>
                 
                 {pImages.map((img, i) => (

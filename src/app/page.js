@@ -19,6 +19,9 @@ export default function Home() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [isProductLoading, setIsProductLoading] = useState(false);
+
   // Global Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [globalSearchProducts, setGlobalSearchProducts] = useState(null);
@@ -44,6 +47,20 @@ export default function Home() {
 
     setCaptchaNum1(Math.floor(Math.random() * 10) + 1);
     setCaptchaNum2(Math.floor(Math.random() * 10) + 1);
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const b = params.get('brand');
+      const sf = params.get('subfilter');
+      const sq = params.get('q');
+      
+      if (sq && sq.length > 2) {
+        setSearchQuery(sq);
+        handleGlobalSearch({ target: { value: sq } }, true);
+      } else if (b) {
+        handleSelectBrand(b, sf || 'all', true);
+      }
+    }
   }, []);
 
   const handleLogout = () => {
@@ -85,9 +102,18 @@ export default function Home() {
     }
   };
 
-  const handleSelectBrand = async (brand) => {
+  const handleSelectBrand = async (brand, subfilter = 'all', skipUrlUpdate = false) => {
     setSelectedBrand(brand);
-    setSelectedSubfilter('all'); // Reset subfilter on brand change
+    setSelectedSubfilter(subfilter);
+    setIsLoading(true);
+
+    if (!skipUrlUpdate && typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('brand', brand);
+      url.searchParams.set('subfilter', subfilter);
+      url.searchParams.delete('q');
+      window.history.pushState({}, '', url);
+    }
     try {
       const res = await fetch(`/api/products?brand=${brand}`);
       const data = await res.json();
@@ -99,12 +125,53 @@ export default function Home() {
     } catch (err) {
       console.error(err);
       setProducts([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleGlobalSearch = async (e) => {
+  const handleSelectSubfilter = (sf) => {
+    setSelectedSubfilter(sf);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('subfilter', sf);
+      window.history.pushState({}, '', url);
+    }
+  };
+
+  const handleProductClick = async (product) => {
+    setSelectedProduct(product);
+    setActiveMediaIndex(0);
+    setIsProductLoading(true);
+    try {
+      const res = await fetch(`/api/products?id=${product.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setSelectedProduct(data.product);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsProductLoading(false);
+    }
+  };
+
+  const handleGlobalSearch = async (e, skipUrlUpdate = false) => {
     const q = e.target.value;
     setSearchQuery(q);
+
+    if (!skipUrlUpdate && typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (q) {
+        url.searchParams.set('q', q);
+        url.searchParams.delete('brand');
+        url.searchParams.delete('subfilter');
+      } else {
+        url.searchParams.delete('q');
+      }
+      window.history.pushState({}, '', url);
+    }
+
     if (q.length > 2) {
       setIsSearching(true);
       try {
@@ -140,6 +207,13 @@ export default function Home() {
             <button className="close-btn" style={{ position: 'static', color: '#333' }} onClick={() => setSelectedProduct(null)}>&times;</button>
           </div>
           
+          {isProductLoading ? (
+            <div style={{ padding: '4rem', textAlign: 'center', fontSize: '1.2rem', color: '#6c757d', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div style={{ animation: 'spin 1s linear infinite', border: '4px solid #f3f3f3', borderTop: '4px solid var(--primary-color)', borderRadius: '50%', width: '40px', height: '40px', marginRight: '1rem' }}></div>
+              Cargando información del producto...
+              <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+            </div>
+          ) : (
           <div style={{ display: 'flex', flex: 1, overflowY: 'auto', flexWrap: 'wrap' }}>
             {/* Left Column: Gallery */}
             <div style={{ flex: '1 1 300px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderRight: '1px solid #eee' }}>
@@ -151,8 +225,8 @@ export default function Home() {
                 {allMedia.length > 0 && activeMedia?.type === 'video' && (
                   <iframe
                     style={{ width: '100%', height: '100%' }}
-                    src={`https://www.youtube.com/embed/${activeMedia.id}?autoplay=0&rel=0&modestbranding=1`}
-                    title="YouTube video player"
+                    src={activeMedia.id.includes('drive.google.com') ? activeMedia.id.replace(/\/view.*$/, '/preview') : `https://www.youtube.com/embed/${activeMedia.id}?autoplay=0&rel=0&modestbranding=1`}
+                    title="Video player"
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
@@ -185,7 +259,14 @@ export default function Home() {
             {/* Right Column: Ficha / Features */}
             <div style={{ flex: '1 1 300px', padding: '2rem', display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: '0.9rem', color: '#666', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: 'bold', letterSpacing: '1px' }}>Philips {selectedProduct.brand}</div>
-              <h2 style={{ fontSize: '2.5rem', color: '#0B5ED7', marginBottom: '0.5rem', lineHeight: '1.2' }}>{selectedProduct.name}</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <h2 style={{ fontSize: '2.5rem', color: '#0B5ED7', margin: 0, lineHeight: '1.2' }}>{selectedProduct.name}</h2>
+                {userRole === 'admin' && (
+                  <button onClick={() => window.location.href = `/admin?editId=${selectedProduct.id}`} className="btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '1rem', width: 'auto', margin: 0, whiteSpace: 'nowrap' }}>
+                    ✏️ Editar
+                  </button>
+                )}
+              </div>
               <div style={{ fontSize: '1.1rem', color: '#6c757d', marginBottom: '2.5rem' }}>SKU: {selectedProduct.sku}</div>
               
               <h3 style={{ fontSize: '1.3rem', marginBottom: '1.5rem', borderBottom: '2px solid #0B5ED7', paddingBottom: '0.5rem', display: 'inline-block', color: '#333' }}>Puntos Fuertes</h3>
@@ -194,6 +275,7 @@ export default function Home() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     );
@@ -229,8 +311,8 @@ export default function Home() {
 
   if (!selectedBrand) {
     return (
-      <main className="container" style={{ padding: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', maxWidth: '1200px', marginBottom: '1rem', gap: '1rem' }}>
+      <main className="container" style={{ padding: '2rem 1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', maxWidth: '1200px', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
           {userRole === 'admin' && (
             <a href="/admin" className="btn-primary" style={{ width: 'auto', margin: 0, textDecoration: 'none' }}>
               Panel de Control
@@ -269,7 +351,7 @@ export default function Home() {
                   const imgs = getParsedArray(product.images);
                   const coverImage = imgs.length > 0 ? imgs[0] : product.image;
                   return (
-                  <div key={product.id} className="product-card" onClick={() => { setSelectedProduct(product); setActiveMediaIndex(0); }}>
+                  <div key={product.id} className="product-card" onClick={() => handleProductClick(product)}>
                     <img src={coverImage} alt={product.name} className="product-image" />
                     <div className="product-info">
                       <div className="product-name">{product.name}</div>
@@ -323,12 +405,20 @@ export default function Home() {
   });
 
   return (
-    <main className="container" style={{ padding: '2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: '1200px', marginBottom: '1rem' }}>
-        <button className="btn-secondary" onClick={() => setSelectedBrand(null)} style={{ margin: 0 }}>
+    <main className="container" style={{ padding: '2rem 1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: '1200px', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <button className="btn-secondary" onClick={() => {
+          setSelectedBrand(null);
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('brand');
+            url.searchParams.delete('subfilter');
+            window.history.pushState({}, '', url);
+          }
+        }} style={{ margin: 0 }}>
           &larr; Volver a Categorías
         </button>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           {userRole === 'admin' && (
             <a href="/admin" className="btn-primary" style={{ width: 'auto', marginTop: 0, textDecoration: 'none' }}>
               Panel de Control
@@ -342,16 +432,16 @@ export default function Home() {
 
       {selectedBrand === 'home' && (
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '2rem', flexWrap: 'wrap' }}>
-          <button className={selectedSubfilter === 'all' ? 'btn-primary' : 'btn-secondary'} onClick={() => setSelectedSubfilter('all')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
+          <button className={selectedSubfilter === 'all' ? 'btn-primary' : 'btn-secondary'} onClick={() => handleSelectSubfilter('all')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
             Todos
           </button>
-          <button className={selectedSubfilter === 'freidoras' ? 'btn-primary' : 'btn-secondary'} onClick={() => setSelectedSubfilter('freidoras')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
+          <button className={selectedSubfilter === 'freidoras' ? 'btn-primary' : 'btn-secondary'} onClick={() => handleSelectSubfilter('freidoras')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
             Freidoras
           </button>
-          <button className={selectedSubfilter === 'cafeteras' ? 'btn-primary' : 'btn-secondary'} onClick={() => setSelectedSubfilter('cafeteras')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
+          <button className={selectedSubfilter === 'cafeteras' ? 'btn-primary' : 'btn-secondary'} onClick={() => handleSelectSubfilter('cafeteras')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
             Cafeteras
           </button>
-          <button className={selectedSubfilter === 'licuadoras' ? 'btn-primary' : 'btn-secondary'} onClick={() => setSelectedSubfilter('licuadoras')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
+          <button className={selectedSubfilter === 'licuadoras' ? 'btn-primary' : 'btn-secondary'} onClick={() => handleSelectSubfilter('licuadoras')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
             Licuadoras
           </button>
         </div>
@@ -359,35 +449,43 @@ export default function Home() {
 
       {selectedBrand === 'audio' && (
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '2rem', flexWrap: 'wrap' }}>
-          <button className={selectedSubfilter === 'all' ? 'btn-primary' : 'btn-secondary'} onClick={() => setSelectedSubfilter('all')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
+          <button className={selectedSubfilter === 'all' ? 'btn-primary' : 'btn-secondary'} onClick={() => handleSelectSubfilter('all')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
             Todos
           </button>
-          <button className={selectedSubfilter === 'audifonos' ? 'btn-primary' : 'btn-secondary'} onClick={() => setSelectedSubfilter('audifonos')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
+          <button className={selectedSubfilter === 'audifonos' ? 'btn-primary' : 'btn-secondary'} onClick={() => handleSelectSubfilter('audifonos')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
             Audífonos
           </button>
-          <button className={selectedSubfilter === 'barra' ? 'btn-primary' : 'btn-secondary'} onClick={() => setSelectedSubfilter('barra')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
+          <button className={selectedSubfilter === 'barra' ? 'btn-primary' : 'btn-secondary'} onClick={() => handleSelectSubfilter('barra')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
             Barras de Sonido
           </button>
-          <button className={selectedSubfilter === 'bocina' ? 'btn-primary' : 'btn-secondary'} onClick={() => setSelectedSubfilter('bocina')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
+          <button className={selectedSubfilter === 'bocina' ? 'btn-primary' : 'btn-secondary'} onClick={() => handleSelectSubfilter('bocina')} style={{ margin: 0, width: 'auto', padding: '0.5rem 1rem' }}>
             Bocinas
           </button>
         </div>
       )}
 
-      <div className="products-grid">
-        {filteredProducts.map(product => {
-          const imgs = getParsedArray(product.images);
-          const coverImage = imgs.length > 0 ? imgs[0] : product.image;
-          return (
-          <div key={product.id} className="product-card" onClick={() => { setSelectedProduct(product); setActiveMediaIndex(0); }}>
-            <img src={coverImage} alt={product.name} className="product-image" />
-            <div className="product-info">
-              <div className="product-name">{product.name}</div>
-              <div className="product-sku">SKU: {product.sku}</div>
+      {isLoading ? (
+        <div style={{ padding: '4rem', textAlign: 'center', fontSize: '1.2rem', color: '#6c757d', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ animation: 'spin 1s linear infinite', border: '4px solid #f3f3f3', borderTop: '4px solid var(--primary-color)', borderRadius: '50%', width: '40px', height: '40px', marginRight: '1rem' }}></div>
+          Cargando productos...
+          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+        </div>
+      ) : (
+        <div className="products-grid">
+          {filteredProducts.map(product => {
+            const imgs = getParsedArray(product.images);
+            const coverImage = imgs.length > 0 ? imgs[0] : product.image;
+            return (
+            <div key={product.id} className="product-card" onClick={() => handleProductClick(product)}>
+              <img src={coverImage} alt={product.name} className="product-image" />
+              <div className="product-info">
+                <div className="product-name">{product.name}</div>
+                <div className="product-sku">SKU: {product.sku}</div>
+              </div>
             </div>
-          </div>
-        )})}
-      </div>
+          )})}
+        </div>
+      )}
 
       {renderProductModal()}
     </main>

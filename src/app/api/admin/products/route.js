@@ -28,15 +28,7 @@ export async function POST(request) {
     if (images && Array.isArray(images)) {
       for (const img of images) {
         if (img.type === 'base64' && img.data) {
-          const matches = img.data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-          if (matches && matches.length === 3) {
-            const imageBuffer = Buffer.from(matches[2], 'base64');
-            const extension = matches[1].split('/')[1]; // e.g., png, jpeg
-            const fileName = `${crypto.randomBytes(16).toString('hex')}.${extension}`;
-            const filePath = path.join(process.cwd(), 'public', 'uploads', fileName);
-            fs.writeFileSync(filePath, imageBuffer);
-            finalImageUrls.push(`/uploads/${fileName}`);
-          }
+          finalImageUrls.push(img.data);
         } else if (img.type === 'url' && img.url) {
           finalImageUrls.push(img.url);
         }
@@ -87,15 +79,7 @@ export async function PUT(request) {
     if (images && Array.isArray(images)) {
       for (const img of images) {
         if (img.type === 'base64' && img.data) {
-          const matches = img.data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-          if (matches && matches.length === 3) {
-            const imageBuffer = Buffer.from(matches[2], 'base64');
-            const extension = matches[1].split('/')[1];
-            const fileName = `${crypto.randomBytes(16).toString('hex')}.${extension}`;
-            const filePath = path.join(process.cwd(), 'public', 'uploads', fileName);
-            fs.writeFileSync(filePath, imageBuffer);
-            finalImageUrls.push(`/uploads/${fileName}`);
-          }
+          finalImageUrls.push(img.data);
         } else if (img.type === 'url' && img.url) {
           finalImageUrls.push(img.url);
         }
