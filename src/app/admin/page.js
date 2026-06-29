@@ -26,6 +26,18 @@ export default function AdminDashboard() {
 
   const [message, setMessage] = useState('');
 
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/admin/users');
+      const data = await res.json();
+      if (data.success) {
+        setUsers(data.users);
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    }
+  };
+
   const fetchProducts = async () => {
     const res = await fetch('/api/admin/products');
     const data = await res.json();

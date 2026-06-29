@@ -216,7 +216,7 @@ export default function Home() {
           ) : (
           <div style={{ display: 'flex', flex: 1, overflowY: 'auto', flexWrap: 'wrap' }}>
             {/* Left Column: Gallery */}
-            <div style={{ flex: '1 1 300px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderRight: '1px solid #eee' }}>
+            <div style={{ flex: '1 1 300px', minWidth: 0, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderRight: '1px solid #eee' }}>
               {/* Main Media Viewer */}
               <div style={{ width: '100%', height: '400px', background: '#fff', borderRadius: '8px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 {allMedia.length > 0 && activeMedia?.type === 'image' && (
@@ -257,7 +257,7 @@ export default function Home() {
             </div>
             
             {/* Right Column: Ficha / Features */}
-            <div style={{ flex: '1 1 300px', padding: '2rem', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: '1 1 300px', minWidth: 0, padding: '2rem', display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: '0.9rem', color: '#666', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: 'bold', letterSpacing: '1px' }}>Philips {selectedProduct.brand}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <h2 style={{ fontSize: '2.5rem', color: '#0B5ED7', margin: 0, lineHeight: '1.2' }}>{selectedProduct.name}</h2>
